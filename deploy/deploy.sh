@@ -47,6 +47,14 @@ npm rebuild better-sqlite3
 # Seed database
 node deploy/seed-remote.js
 
+# Ensure admin secret exists
+if [ ! -f .env ]; then touch .env; fi
+if ! grep -q "^ADMIN_SECRET=" .env 2>/dev/null; then
+  SECRET="aimusic-$(openssl rand -hex 16)"
+  echo "ADMIN_SECRET=$SECRET" >> .env
+  echo "Generated ADMIN_SECRET (saved to .env)"
+fi
+
 # PM2
 if pm2 describe ai-music-player > /dev/null 2>&1; then
   pm2 restart ai-music-player

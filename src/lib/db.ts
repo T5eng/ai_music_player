@@ -72,6 +72,12 @@ function initSchema(database: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_tracks_status ON tracks(status);
     CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
   `);
+
+  try {
+    database.exec(`ALTER TABLE tracks ADD COLUMN is_preset INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // column already exists
+  }
 }
 
 function rowToTrack(row: Record<string, unknown>): Track {
@@ -91,6 +97,7 @@ function rowToTrack(row: Record<string, unknown>): Track {
     murekaTaskId: (row.mureka_task_id as string) || null,
     tags: JSON.parse((row.tags as string) || "[]"),
     createdAt: row.created_at as number,
+    isPreset: Boolean(row.is_preset),
   };
 }
 
@@ -99,9 +106,9 @@ export function insertTrack(track: Track) {
   database
     .prepare(
       `INSERT INTO tracks (id, title, artist, mode, prompt, lyrics_theme, language,
-        audio_url, stream_url, cover_url, duration_ms, status, mureka_task_id, tags, created_at)
+        audio_url, stream_url, cover_url, duration_ms, status, mureka_task_id, tags, is_preset, created_at)
        VALUES (@id, @title, @artist, @mode, @prompt, @lyricsTheme, @language,
-        @audioUrl, @streamUrl, @coverUrl, @durationMs, @status, @murekaTaskId, @tags, @createdAt)`
+        @audioUrl, @streamUrl, @coverUrl, @durationMs, @status, @murekaTaskId, @tags, @isPreset, @createdAt)`
     )
     .run({
       ...track,
@@ -112,6 +119,7 @@ export function insertTrack(track: Track) {
       durationMs: track.durationMs,
       murekaTaskId: track.murekaTaskId,
       tags: JSON.stringify(track.tags),
+      isPreset: track.isPreset ? 1 : 0,
     });
 }
 
@@ -162,10 +170,26 @@ export function getReadyTracks(limit = 20): Track[] {
   const rows = getDb()
     .prepare(
       `SELECT * FROM tracks WHERE status = 'ready' AND audio_url IS NOT NULL
-       ORDER BY created_at DESC LIMIT ?`
+       ORDER BY is_preset DESC, created_at DESC LIMIT ?`
     )
     .all(limit) as Record<string, unknown>[];
   return rows.map(rowToTrack);
+}
+
+export function getPresetTracks(): Track[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM tracks WHERE is_preset = 1 ORDER BY created_at DESC`
+    )
+    .all() as Record<string, unknown>[];
+  return rows.map(rowToTrack);
+}
+
+export function deleteTrack(id: string): boolean {
+  const result = getDb()
+    .prepare("DELETE FROM tracks WHERE id = ? AND is_preset = 1")
+    .run(id);
+  return result.changes > 0;
 }
 
 export function getOrCreateSession(sessionId: string): UserProfile {

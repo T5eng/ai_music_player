@@ -346,6 +346,15 @@ export function MusicPlayer() {
         {profile && (
           <PreferenceSliders profile={profile} onChange={handlePrefChange} />
         )}
+
+        <footer className="mt-4 text-center">
+          <a
+            href="/ai-music/admin"
+            className="text-xs text-white/30 transition hover:text-white/60"
+          >
+            管理预置曲目 →
+          </a>
+        </footer>
       </div>
 
       <audio

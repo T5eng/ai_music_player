@@ -23,6 +23,7 @@ export interface Track {
   murekaTaskId: string | null;
   tags: string[];
   createdAt: number;
+  isPreset?: boolean;
 }
 
 export interface UserProfile {
