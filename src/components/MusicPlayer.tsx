@@ -56,16 +56,22 @@ export function MusicPlayer() {
   const current = queue?.current;
 
   const initSession = useCallback(async () => {
-    const res = await fetch(`${API_BASE}/session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: sessionId.current }),
-    });
-    const data = await res.json();
-    setQueue(data.queue);
-    setProfile(data.profile);
-    setMurekaEnabled(data.murekaEnabled);
-    setLoading(false);
+    try {
+      const res = await fetch(`${API_BASE}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sessionId.current }),
+      });
+      if (!res.ok) throw new Error(`Session init failed: ${res.status}`);
+      const data = await res.json();
+      setQueue(data.queue);
+      setProfile(data.profile);
+      setMurekaEnabled(data.murekaEnabled);
+    } catch (err) {
+      console.error("Failed to init session:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -207,6 +213,22 @@ export function MusicPlayer() {
         <div className="flex flex-col items-center gap-4">
           <Radio className="h-10 w-10 animate-pulse text-accent" />
           <p className="text-sm text-white/50">正在启动 AI 电台…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!queue?.current) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <p className="text-sm text-white/50">连接失败，请刷新页面重试</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-full bg-accent px-4 py-2 text-sm"
+          >
+            刷新
+          </button>
         </div>
       </div>
     );

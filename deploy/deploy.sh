@@ -62,8 +62,17 @@ if ! grep -q "ai-music" "$NGINX_CONF" 2>/dev/null; then
   sudo cp "$NGINX_CONF" "${NGINX_CONF}.bak.$(date +%s)"
   sudo sed -i '/location \/ {/i\
     # AI Music Player\
-    location /ai-music/ {\
-        proxy_pass http://127.0.0.1:3010/ai-music/;\
+    location /ai-music/api/stream {\
+        proxy_pass http://127.0.0.1:3010/ai-music/api/stream;\
+        proxy_http_version 1.1;\
+        proxy_set_header Connection '\'''\'';\
+        proxy_buffering off;\
+        proxy_cache off;\
+        proxy_read_timeout 3600s;\
+        chunked_transfer_encoding off;\
+    }\
+    location ^~ /ai-music {\
+        proxy_pass http://127.0.0.1:3010;\
         proxy_http_version 1.1;\
         proxy_set_header Upgrade $http_upgrade;\
         proxy_set_header Connection '\''upgrade'\'';\
@@ -74,20 +83,12 @@ if ! grep -q "ai-music" "$NGINX_CONF" 2>/dev/null; then
         proxy_cache_bypass $http_upgrade;\
         proxy_read_timeout 300s;\
     }\
-    location /ai-music/api/stream {\
-        proxy_pass http://127.0.0.1:3010/ai-music/api/stream;\
-        proxy_http_version 1.1;\
-        proxy_set_header Connection '\'''\'';\
-        proxy_buffering off;\
-        proxy_cache off;\
-        proxy_read_timeout 3600s;\
-        chunked_transfer_encoding off;\
-    }\
 ' "$NGINX_CONF"
   sudo nginx -t && sudo systemctl reload nginx
   echo "Nginx configured for /ai-music"
 else
   echo "Nginx already has /ai-music config"
+  sudo sed -i 's/location \/ai-music {/location ^~ \/ai-music {/g' "$NGINX_CONF" 2>/dev/null || true
   sudo nginx -t && sudo systemctl reload nginx
 fi
 
