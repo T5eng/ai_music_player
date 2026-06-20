@@ -4,9 +4,10 @@ AI 驱动的个性化音乐电台。根据用户行为和偏好，动态生成�
 
 ## 访问地址
 
-部署后访问：**http://mirac.site/ai-music**
+- **推荐（IP 直连）**：http://119.45.180.7/ai-music
+- **域名（需完成备案后）**：http://mirac.site/ai-music
 
-独立入口，不影响现有 pixelforge (`/`) 和 t-trading 服务。
+独立入口 `/ai-music`，不影响现有 pixelforge (`/`) 和 t-trading 服务。
 
 ## 功能
 
