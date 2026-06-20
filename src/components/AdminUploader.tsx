@@ -12,15 +12,17 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import type { Track, TrackMode } from "@/types";
+import { useMounted } from "@/hooks/useMounted";
 
 const API_BASE = "/ai-music/api";
 const TOKEN_KEY = "ai-music-admin-token";
 
 export function AdminUploader() {
+  const mounted = useMounted();
   const [token, setToken] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<{
     type: "ok" | "err";
@@ -69,17 +71,19 @@ export function AdminUploader() {
   }, [token, authHeaders]);
 
   useEffect(() => {
+    if (!mounted) return;
     const saved = sessionStorage.getItem(TOKEN_KEY);
     if (saved) setToken(saved);
-  }, []);
+  }, [mounted]);
 
   useEffect(() => {
-    if (token) loadTracks();
-    else setLoading(false);
-  }, [token, loadTracks]);
+    if (!mounted || !token) return;
+    loadTracks();
+  }, [mounted, token, loadTracks]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!token) return;
     loadTracks();
   };
 
@@ -153,6 +157,14 @@ export function AdminUploader() {
       setMessage({ type: "err", text: "删除失败" });
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-white/50">加载中…</p>
+      </div>
+    );
+  }
 
   if (!authenticated) {
     return (

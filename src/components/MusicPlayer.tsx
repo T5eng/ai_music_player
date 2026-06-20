@@ -15,18 +15,10 @@ import type { Track, QueueState, UserProfile } from "@/types";
 import { PreferenceSliders } from "./PreferenceSliders";
 import { QueuePanel } from "./QueuePanel";
 import { Visualizer } from "./Visualizer";
+import { getOrCreateSessionId } from "@/lib/session";
+import { useMounted } from "@/hooks/useMounted";
 
 const API_BASE = "/ai-music/api";
-
-function getSessionId(): string {
-  if (typeof window === "undefined") return "";
-  let id = localStorage.getItem("ai-music-session");
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem("ai-music-session", id);
-  }
-  return id;
-}
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -35,8 +27,9 @@ function formatTime(sec: number) {
 }
 
 export function MusicPlayer() {
+  const mounted = useMounted();
   const audioRef = useRef<HTMLAudioElement>(null);
-  const sessionId = useRef(getSessionId());
+  const sessionId = useRef("");
   const progressSent = useRef(false);
 
   const [queue, setQueue] = useState<QueueState | null>(null);
@@ -56,6 +49,9 @@ export function MusicPlayer() {
   const current = queue?.current;
 
   const initSession = useCallback(async () => {
+    if (!sessionId.current) {
+      sessionId.current = getOrCreateSessionId();
+    }
     try {
       const res = await fetch(`${API_BASE}/session`, {
         method: "POST",
@@ -75,43 +71,58 @@ export function MusicPlayer() {
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     initSession();
-  }, [initSession]);
+  }, [mounted, initSession]);
 
   useEffect(() => {
+    if (!mounted || !sessionId.current) return;
+
     const es = new EventSource(
       `${API_BASE}/stream?sessionId=${sessionId.current}`
     );
 
     es.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      if (data.type === "queue") {
-        setQueue((prev) =>
-          prev
-            ? {
-                ...prev,
-                next: data.next,
-                generating: data.generating,
-                upcoming: [data.next, data.generating].filter(Boolean),
-              }
-            : prev
-        );
-      }
-      if (data.type === "generation") {
-        setGenStatus({
-          progress: data.progress,
-          message: data.message,
-        });
-        if (data.status === "ready") {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === "queue") {
           setQueue((prev) =>
-            prev ? { ...prev, next: { ...prev.next!, audioUrl: data.audioUrl, status: "ready" } as Track } : prev
+            prev
+              ? {
+                  ...prev,
+                  next: data.next,
+                  generating: data.generating,
+                  upcoming: [data.next, data.generating].filter(Boolean),
+                }
+              : prev
           );
         }
+        if (data.type === "generation") {
+          setGenStatus({
+            progress: data.progress,
+            message: data.message,
+          });
+          if (data.status === "ready" && data.audioUrl) {
+            setQueue((prev) => {
+              if (!prev?.next) return prev;
+              return {
+                ...prev,
+                next: {
+                  ...prev.next,
+                  audioUrl: data.audioUrl,
+                  status: "ready",
+                },
+              };
+            });
+          }
+        }
+      } catch {
+        // ignore malformed SSE payloads
       }
     };
 
     return () => es.close();
-  }, []);
+  }, [mounted]);
 
   useEffect(() => {
     if (!current?.audioUrl || !audioRef.current) return;
@@ -207,7 +218,7 @@ export function MusicPlayer() {
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-4">
